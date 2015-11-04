@@ -112,9 +112,9 @@ def parse_file(filename):
                     count += 1
                 current_product = Product()
                 continue
-
+            
             # fill in the fields of the Product object
-            if line[0] == ID:
+            elif line[0] == ID:
                 current_product.id = int(line[1])
             elif line[0] == ASIN:
                 current_product.asin = line[1]
