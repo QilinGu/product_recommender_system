@@ -48,14 +48,16 @@ typedef struct {
 
 
 // function prototypes
-void group_user_co_reviews(map<pair<int, int>, set<Product*>>& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid);
+void group_user_co_reviews(map< pair<int, int>, set<Product*> >& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid);
 Product* create_product();
 Review* create_review();
 void make_product_graph(map<string, Product*>& asin_to_product);
-void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<Product*>>& co_reviews, map<int, set<int>>& user_graph);
+void make_user_graph(map< string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map< int, set< pair<int, int>> >& user_graph);
 void parse_file(string filename, map<string, Product*>& asin_to_product,
     map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user);
 vector<string> split(string str, char delimiter);
+
+int getUserEdgeWeight(int user1, int user2);
 
 
 int main()
@@ -65,9 +67,23 @@ int main()
     map<int, Product*> id_to_product = map<int, Product*>();
     map<string, int> user_to_nodeid = map<string, int>();
     map<int, string> nodeid_to_user = map<int, string>();
-    map<pair<int, int>, set<Product*>> user_co_reviews = 
-        map<pair<int, int>, set<Product*>>();
-    map<int, set<int>> user_graph = map<int, set<int>>();
+    map<pair<int, int>, set<Product*> > user_co_reviews = 
+        map<pair<int, int>, set<Product*> >();
+
+    /*
+    user_graph
+        key = user node
+        value = pair (userid2, edge weight)
+    */
+    map<int, set< pair<int, int>> > user_graph = map<int, set< pair<int, int>> >();
+
+    /*
+    product_graph
+        key = product asin
+        value = pair (product asin2, edge weight)
+    */
+    map<string, set< pair<string, double>> > product_graph = map<string, set< pair<string, double>> >();
+
     
     // parse the data file (makes the product-product graphs), the next two 
     // functions make the user-user graph. using the amazon-small.txt file for 
@@ -93,6 +109,10 @@ int main()
      */
     cout << "user_graph: " << user_graph.size() << endl;
 
+
+    make_product_graph(asin_to_product, product_graph);
+
+
     return 0;
 }
 
@@ -100,7 +120,7 @@ int main()
 /* Using the product information, create a map of (user ID 1, user ID 2) ->
  * set of Products that they reviewed.
  */
-void group_user_co_reviews(map<pair<int, int>, set<Product*>>& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid)
+void group_user_co_reviews(map<pair<int, int>, set<Product*> >& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid)
 {
     // int count = 0;
     for (auto it = asin_to_product.begin(); it != asin_to_product.end(); ++it)
@@ -111,6 +131,7 @@ void group_user_co_reviews(map<pair<int, int>, set<Product*>>& co_reviews, map<s
             reviewers.insert(it2->first);
         }
 
+        // for each reviewer of this product, add their nodeid's as a pair to co_reviews
         for (auto i = reviewers.begin(); i != reviewers.end(); ++i)
         {
             for (auto j = i; ++j != reviewers.end(); )
@@ -161,19 +182,30 @@ Review* create_review(string date, string helpful, string rating, string votes,
 /* Creates an adjacency list for the graph, node ID -> set of neighboring node
  * IDs.
  */
-void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<Product*>>& co_reviews, map<int, set<int>>& user_graph)
+void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map<int, set< pair<int, int>> >& user_graph)
 {
     for (auto it = co_reviews.begin(); it != co_reviews.end(); ++it)
     {
         int user1 = it->first.first;
         int user2 = it->first.second;
-        user_graph[user1].insert(user2);
-        user_graph[user2].insert(user1);
+
+        int weight = getUserEdgeWeight(user1, user2);
+
+        user_graph[user1].insert( pair<int, int>(user2, weight) );
+        user_graph[user2].insert( pair<int, int>(user1, weight) );
     }
 }
 
 
-/* Creates the main product-product graph (asin -> prodcut objects; node id ->
+int getUserEdgeWeight(int user1, int user2){
+    // TODO - FILL IN WHEN IMPLEMENTING OUR ALGORITHM
+    return 0;
+}
+
+
+
+
+/* Creates the main product-product graph (asin -> product objects; node id ->
  * product object). Also creates the amazon user ID -> node ID graph
  */
 void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user)
@@ -184,7 +216,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
     Product* current_product = create_product();
     vector<string> tokens;
 
-    // int count = 0;
+    int count = 0;
     int user_count = 0;
 
     while (getline(infile, line))
@@ -194,7 +226,8 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
             asin_to_product[current_product->asin] = current_product;
             id_to_product[current_product->id] = current_product;
             current_product = create_product();
-            // count++;
+            count++;
+            if (count == 10) break;
             // if (count % 1000 == 0)
             // {
             //     cout << count << endl;
@@ -279,3 +312,27 @@ vector<string> split(string str, char delimiter)
 
     return tokens;
 }
+
+/*
+    Constructs product to product graph
+    Weight of edges will be added for baseline
+*/
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph){
+
+    // for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it){
+
+        
+        
+    // }
+}
+
+
+
+
+
+
+
+
+
+
+
