@@ -54,13 +54,13 @@ Review* create_review();
 void make_product_graph(map<string, Product*>& asin_to_product);
 void make_user_graph(map< string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map< int, set< pair<int, int>> >& user_graph);
 // void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user);
-void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >users_to_products);
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > > &users_to_products);
 vector<string> split(string str, char delimiter);
 
 int getUserEdgeWeight(int user1, int user2);
-void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph);
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >users_to_products);
 
-double scoreUsersWhoPurchasedProducts(string product1, string product2);
+double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >users_to_products);
 
 
 int main()
@@ -122,7 +122,7 @@ int main()
     cout << "user_graph: " << user_graph.size() << endl;
 
 
-    make_product_graph(asin_to_product, product_graph);
+    make_product_graph(asin_to_product, product_graph, users_to_products);
 
 
     return 0;
@@ -221,7 +221,7 @@ int getUserEdgeWeight(int user1, int user2){
  * product object). Also creates the amazon user ID -> node ID graph
  */
 // void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string)
-void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >users_to_products)
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >&users_to_products)
 {
     ifstream infile(filename.c_str());
     cout << "opened" << endl;
@@ -338,30 +338,59 @@ vector<string> split(string str, char delimiter)
     Constructs product to product graph
     Weight of edges will be added for baseline
 */
-void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph){
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >users_to_products){
 
     for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it){
 
-        string productString = product_it->first;
+        string firstProductString = product_it->first;
         Product *firstProduct = product_it->second;
 
         for (auto second_product_it = firstProduct->similar->begin(); second_product_it != firstProduct->similar->end(); ++second_product_it){
+
+            string secondProductString = *second_product_it;
             Product *secondProduct = asin_to_product[*second_product_it];
 
             // number of users that bought object j
             int o_j = secondProduct->reviews->size();
 
-            double score = scoreUsersWhoPurchasedProducts(productString, *second_product_it);
+            double score = scoreUsersWhoPurchasedBothProducts(firstProductString, secondProductString, users_to_products);
+
+            double weight = (1/double(o_j))*score;
+            // cout << firstProductString << ", " << secondProductString << " - " << score << endl;
+            // add edge weight to product graph
+            product_graph[ firstProductString ].insert( pair<string, double>(secondProductString, weight) );
         }
-
-        cout << productString << endl;
-
     }
 }
 
 
-double scoreUsersWhoPurchasedProducts(string product1, string product2){
-    return 0.0;
+void printSet(set<string>products){
+    for (auto it = products.begin(); it != products.end(); ++it){
+        cout << *it << ", ";
+    }
+    cout << endl;
+}
+
+
+double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >users_to_products){
+
+    double sum = 0;
+    // cout << users_to_products.size() << endl;
+    
+    for (auto user_it = users_to_products.begin(); user_it != users_to_products.end(); ++user_it){
+        // string user = user_it->first;
+        // cout << user_it->first << ": ";
+        set<string>products = user_it->second;
+        // printSet(products);
+
+        int userHasBoth = 0;
+        if(products.find(product1) != products.end() && products.find(product2) != products.end()) userHasBoth = 1;
+
+        int u_l = products.size();
+
+        sum += userHasBoth/double(u_l);
+    }
+    return sum;
 }
 
 
