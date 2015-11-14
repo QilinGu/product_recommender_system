@@ -53,11 +53,14 @@ Product* create_product();
 Review* create_review();
 void make_product_graph(map<string, Product*>& asin_to_product);
 void make_user_graph(map< string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map< int, set< pair<int, int>> >& user_graph);
-void parse_file(string filename, map<string, Product*>& asin_to_product,
-    map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user);
+// void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user);
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >users_to_products);
 vector<string> split(string str, char delimiter);
 
 int getUserEdgeWeight(int user1, int user2);
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph);
+
+double scoreUsersWhoPurchasedProducts(string product1, string product2);
 
 
 int main()
@@ -84,11 +87,20 @@ int main()
     */
     map<string, set< pair<string, double>> > product_graph = map<string, set< pair<string, double>> >();
 
+    /*
+    users_to_products
+        key = username
+        value = set of products user has purchased
+    */
+    map< string, set< string > >users_to_products = map< string, set< string > >();
+
     
     // parse the data file (makes the product-product graphs), the next two 
     // functions make the user-user graph. using the amazon-small.txt file for 
     // now since the other one is huge. feel free to use the regular data file.
-    parse_file("amazon-small.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user);
+    parse_file("test.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user, users_to_products);
+    // parse_file("amazon-small.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user);
+
     group_user_co_reviews(user_co_reviews, asin_to_product, user_to_nodeid);
     make_user_graph(user_to_nodeid, user_co_reviews, user_graph);
 
@@ -208,7 +220,8 @@ int getUserEdgeWeight(int user1, int user2){
 /* Creates the main product-product graph (asin -> product objects; node id ->
  * product object). Also creates the amazon user ID -> node ID graph
  */
-void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user)
+// void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string)
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >users_to_products)
 {
     ifstream infile(filename.c_str());
     cout << "opened" << endl;
@@ -285,9 +298,17 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
             {
                 user_to_nodeid[tokens[2]] = user_count;
                 nodeid_to_user[user_count++] = tokens[2];
+                users_to_products[tokens[2]] = set< string >();
             }
+
+            // add product to user's set of purchased items
+            users_to_products[ tokens[2] ].insert( current_product->asin );
         }
     } 
+    asin_to_product[current_product->asin] = current_product;
+    id_to_product[current_product->id] = current_product;
+    current_product = create_product();
+    count++;
 
     infile.close();
 }
@@ -319,14 +340,29 @@ vector<string> split(string str, char delimiter)
 */
 void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph){
 
-    // for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it){
+    for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it){
 
-        
-        
-    // }
+        string productString = product_it->first;
+        Product *firstProduct = product_it->second;
+
+        for (auto second_product_it = firstProduct->similar->begin(); second_product_it != firstProduct->similar->end(); ++second_product_it){
+            Product *secondProduct = asin_to_product[*second_product_it];
+
+            // number of users that bought object j
+            int o_j = secondProduct->reviews->size();
+
+            double score = scoreUsersWhoPurchasedProducts(productString, *second_product_it);
+        }
+
+        cout << productString << endl;
+
+    }
 }
 
 
+double scoreUsersWhoPurchasedProducts(string product1, string product2){
+    return 0.0;
+}
 
 
 
