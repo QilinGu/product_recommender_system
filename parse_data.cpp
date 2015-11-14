@@ -21,6 +21,7 @@ const string SIMILAR = "similar:";
 const string TITLE = "title:";
 
 
+// review information
 typedef struct {
     string date;
     int helpful;
@@ -29,6 +30,8 @@ typedef struct {
     string product_id;
 } Review;
 
+
+// product information
 typedef struct {
     string asin;
     double avg_rating;
@@ -44,36 +47,62 @@ typedef struct {
 } Product;
 
 
-void count_user_co_reviews(map<pair<string, string>, int>& co_reviews,
-    map<string, Product*>& asin_to_product);
+// function prototypes
+void group_user_co_reviews(map<pair<int, int>, set<Product*>>& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid);
 Product* create_product();
 Review* create_review();
 void make_product_graph(map<string, Product*>& asin_to_product);
-void make_user_graph(map<string, int>& user_to_nodeid, map<pair<string, string>, int>& co_reviews);
+void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<Product*>>& co_reviews, map<int, set<int>>& user_graph);
 void parse_file(string filename, map<string, Product*>& asin_to_product,
-    map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid);
+    map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user);
 vector<string> split(string str, char delimiter);
 
 
 int main()
 {
+    // initialize the maps/graphs
     map<string, Product*> asin_to_product = map<string, Product*>();
     map<int, Product*> id_to_product = map<int, Product*>();
     map<string, int> user_to_nodeid = map<string, int>();
-    map<pair<string, string>, int> user_co_reviews = 
-        map<pair<string, string>, int>();
-    parse_file("amazon-meta.txt", asin_to_product, id_to_product, 
-        user_to_nodeid);
-    count_user_co_reviews(user_co_reviews, asin_to_product);
+    map<int, string> nodeid_to_user = map<int, string>();
+    map<pair<int, int>, set<Product*>> user_co_reviews = 
+        map<pair<int, int>, set<Product*>>();
+    map<int, set<int>> user_graph = map<int, set<int>>();
+    
+    // parse the data file (makes the product-product graphs), the next two 
+    // functions make the user-user graph. using the amazon-small.txt file for 
+    // now since the other one is huge. feel free to use the regular data file.
+    parse_file("amazon-small.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user);
+    group_user_co_reviews(user_co_reviews, asin_to_product, user_to_nodeid);
+    make_user_graph(user_to_nodeid, user_co_reviews, user_graph);
+
+    // these two should be the same size
+    cout << "asin_to_product: " << asin_to_product.size() << endl;
+    cout << "id_to_product: " << id_to_product.size() << endl;
+
+    // these two should be the same size
+    cout << "user_to_nodeid: " << user_to_nodeid.size() << endl;
+    cout << "nodeid_to_user: " << nodeid_to_user.size() << endl;
+
+    // 25,000 users create 13 million co-reviews, this is huge
+    cout << "user_co_reviews: " << user_co_reviews.size() << endl;
+
+    /* this doesn't equal the size of the user_to_nodeid or node_id_to_user 
+     * graphs because some users don't have neighbors. however, it looks like
+     * there are only 300/25000 users that fall into this category.
+     */
+    cout << "user_graph: " << user_graph.size() << endl;
 
     return 0;
 }
 
 
-void count_user_co_reviews(map<pair<string, string>, int>& co_reviews,
-    map<string, Product*>& asin_to_product)
+/* Using the product information, create a map of (user ID 1, user ID 2) ->
+ * set of Products that they reviewed.
+ */
+void group_user_co_reviews(map<pair<int, int>, set<Product*>>& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid)
 {
-    int count = 0;
+    // int count = 0;
     for (auto it = asin_to_product.begin(); it != asin_to_product.end(); ++it)
     {
         set<string> reviewers;
@@ -86,18 +115,23 @@ void count_user_co_reviews(map<pair<string, string>, int>& co_reviews,
         {
             for (auto j = i; ++j != reviewers.end(); )
             {
-                co_reviews[pair<string, string>(*i, *j)]++;
+                int user1 = user_to_nodeid[*i];
+                int user2 = user_to_nodeid[*j];
+                co_reviews[pair<int, int>(user1, user2)].insert(it->second);
+                co_reviews[pair<int, int>(user2, user1)].insert(it->second);
             }
         }
 
-        if (++count % 100 == 0)
-        {
-            cout << count << endl;
-        }
+        // if (++count % 100 == 0)
+        // {
+        //     cout << count << endl;
+        // }
     }
 }
 
 
+/* Creates and returns a new product struct
+ */
 Product* create_product()
 {
     Product* new_product = new Product();
@@ -108,6 +142,9 @@ Product* create_product()
 }
 
 
+/* Creates and returns a new review struct initialized with the provided
+ * information
+ */
 Review* create_review(string date, string helpful, string rating, string votes,
     string product_id)
 {
@@ -121,8 +158,25 @@ Review* create_review(string date, string helpful, string rating, string votes,
 }
 
 
-void parse_file(string filename, map<string, Product*>& asin_to_product,
-    map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid)
+/* Creates an adjacency list for the graph, node ID -> set of neighboring node
+ * IDs.
+ */
+void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<Product*>>& co_reviews, map<int, set<int>>& user_graph)
+{
+    for (auto it = co_reviews.begin(); it != co_reviews.end(); ++it)
+    {
+        int user1 = it->first.first;
+        int user2 = it->first.second;
+        user_graph[user1].insert(user2);
+        user_graph[user2].insert(user1);
+    }
+}
+
+
+/* Creates the main product-product graph (asin -> prodcut objects; node id ->
+ * product object). Also creates the amazon user ID -> node ID graph
+ */
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user)
 {
     ifstream infile(filename.c_str());
     cout << "opened" << endl;
@@ -130,7 +184,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product,
     Product* current_product = create_product();
     vector<string> tokens;
 
-    int count = 0;
+    // int count = 0;
     int user_count = 0;
 
     while (getline(infile, line))
@@ -140,11 +194,11 @@ void parse_file(string filename, map<string, Product*>& asin_to_product,
             asin_to_product[current_product->asin] = current_product;
             id_to_product[current_product->id] = current_product;
             current_product = create_product();
-            count++;
-            if (count % 1000 == 0)
-            {
-                cout << count << endl;
-            }
+            // count++;
+            // if (count % 1000 == 0)
+            // {
+            //     cout << count << endl;
+            // }
             continue;
         }
 
@@ -196,7 +250,8 @@ void parse_file(string filename, map<string, Product*>& asin_to_product,
                 current_product->asin)));
             if (user_to_nodeid.find(tokens[2]) == user_to_nodeid.end())
             {
-                user_to_nodeid[tokens[2]] = user_count++;
+                user_to_nodeid[tokens[2]] = user_count;
+                nodeid_to_user[user_count++] = tokens[2];
             }
         }
     } 
@@ -205,6 +260,9 @@ void parse_file(string filename, map<string, Product*>& asin_to_product,
 }
 
 
+/* For a given string and delimiter, returns a vector of tokens split using the
+ * delimiter.
+ */
 vector<string> split(string str, char delimiter)
 {
     vector<string> tokens;
