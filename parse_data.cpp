@@ -51,14 +51,14 @@ typedef struct {
 void group_user_co_reviews(map< pair<int, int>, set<Product*> >& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid);
 Product* create_product();
 Review* create_review();
-void make_product_graph(map<string, Product*>& asin_to_product);
+// void make_product_graph(map<string, Product*>& asin_to_product);
 void make_user_graph(map< string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map< int, set< pair<int, int>> >& user_graph);
 // void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user);
 void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > > &users_to_products);
 vector<string> split(string str, char delimiter);
 
 int getUserEdgeWeight(int user1, int user2);
-void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >users_to_products);
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products);
 
 double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >users_to_products);
 
@@ -338,7 +338,7 @@ vector<string> split(string str, char delimiter)
     Constructs product to product graph
     Weight of edges will be added for baseline
 */
-void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >users_to_products){
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products){
 
     for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it){
 
