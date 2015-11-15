@@ -1,6 +1,7 @@
 idea
 *.out
 *.pyc
+*.dSYM
 *.txt
 venv
 parse_data

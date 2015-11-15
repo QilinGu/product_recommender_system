@@ -154,7 +154,7 @@ int main()
  */
 void group_user_co_reviews(map<pair<int, int>, set<Product*> >& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid)
 {
-    // int count = 0;
+    int count = 0;
 
     // iterate through each product and get the set of users that have written
     // a review for it. then iterate through each pair of users and add that
@@ -179,10 +179,10 @@ void group_user_co_reviews(map<pair<int, int>, set<Product*> >& co_reviews, map<
             }
         }
 
-        // if (++count % 100 == 0)
-        // {
-        //     cout << count << endl;
-        // }
+        if (++count % 100 == 0)
+        {
+            cout << count << endl;
+        }
     }
 }
 
@@ -265,10 +265,10 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
             current_product = create_product();
             count++;
             // if (count == 10) break;
-            // if (count % 1000 == 0)
-            // {
-            //     cout << count << endl;
-            // }
+            if (count % 1000 == 0)
+            {
+                cout << count << endl;
+            }
             continue;
         }
 
