@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <list>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -60,8 +61,9 @@ vector<string> split(string str, char delimiter);
 int getUserEdgeWeight(int user1, int user2);
 void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products);
 
-double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >users_to_products);
+double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products);
 
+vector< pair<string, double> > makeBaselinePrediction(string user, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph);
 
 int main()
 {
@@ -121,10 +123,11 @@ int main()
      */
     cout << "user_graph: " << user_graph.size() << endl;
 
-
     make_product_graph(asin_to_product, product_graph, users_to_products);
 
-
+    string user = "ANEIANH0WAT9D";
+    makeBaselinePrediction(user, users_to_products, product_graph);
+    
     return 0;
 }
 
@@ -372,7 +375,7 @@ void printSet(set<string>products){
 }
 
 
-double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >users_to_products){
+double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products){
 
     double sum = 0;
     // cout << users_to_products.size() << endl;
@@ -393,8 +396,44 @@ double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map<
     return sum;
 }
 
+#define NUMBER_IN_RECOMMENTATION_SET 5
 
+void printRecommendations(vector< pair<string, double> >&productRecommendations){
+    for (int i=0; i<NUMBER_IN_RECOMMENTATION_SET; i++){
+        if (i < productRecommendations.size()){
+            cout << productRecommendations[i].first << ", " << productRecommendations[i].second << endl;
+        }
+    }
+}
 
+bool sortRecommendationsCmp(pair<string, double>edge1, pair<string, double>edge2){
+    return (edge1.second >= edge2.second);
+}
+
+vector< pair<string, double> > makeBaselinePrediction(string user, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph){
+
+    vector< pair<string, double> >productRecommendations;
+    
+    // iterate over items in user's purchased set
+    for (auto items_it = users_to_products[user].begin(); items_it != users_to_products[user].end();      ++items_it){
+
+        string itemAsin = *items_it;
+
+        // iterate over edges for a purchased item
+        for (auto edges_it = product_graph[itemAsin].begin(); edges_it != product_graph[itemAsin].end(); ++edges_it){
+
+            pair<string, double>edge = *edges_it;
+            productRecommendations.push_back(edge);
+        }
+    }
+
+    // sort list of recommendations
+    sort(productRecommendations.begin(), productRecommendations.end(), sortRecommendationsCmp );
+
+    if (productRecommendations.size() < NUMBER_IN_RECOMMENTATION_SET) return productRecommendations;
+    else return ( vector< pair<string, double> >(productRecommendations.begin(), productRecommendations.begin()+NUMBER_IN_RECOMMENTATION_SET) );
+    // printRecommendations(productRecommendations);
+}
 
 
 
