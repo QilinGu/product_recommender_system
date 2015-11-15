@@ -23,27 +23,27 @@ const string TITLE = "title:";
 
 // review information
 typedef struct {
-    string date;
-    int helpful;
-    int rating;
-    int votes;
-    string product_id;
+    string date;        // date that the review was created
+    int helpful;        // number of people who found the review helpful
+    int rating;         // number of stars given to product by this rating (1-5)
+    int votes;          // number of people who voted on if the review was helpful
+    string product_id;  // product ID
 } Review;
 
 
 // product information
 typedef struct {
-    string asin;
-    double avg_rating;
-    vector<string>* categories;
-    int downloaded_reviews;
-    string group;
-    int id;
-    map<string, Review*>* reviews;
-    int salesrank;
-    vector<string>* similar;
-    string title;
-    int total_reviews;
+    string asin;                    // amazon product ID
+    double avg_rating;              // average star rating from all of the reviews
+    vector<string>* categories;     // categorization of the product
+    int downloaded_reviews;         // number of reviews of the product that are captured in the dataset
+    string group;                   // major category (books, music, etc.)
+    int id;                         // index in the database (probably not useful)
+    map<string, Review*>* reviews;  // map of amazon user id -> review struct
+    int salesrank;                  // amazon salesrank score
+    vector<string>* similar;        // co-purchased product asins
+    string title;                   // name of the item
+    int total_reviews;              // number of total product reviews, usually equal to downloaded_reviews
 } Product;
 
 
@@ -103,6 +103,10 @@ int main()
 void group_user_co_reviews(map<pair<int, int>, set<Product*>>& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid)
 {
     // int count = 0;
+
+    // iterate through each product and get the set of users that have written
+    // a review for it. then iterate through each pair of users and add that
+    // product to their co-reviewed set
     for (auto it = asin_to_product.begin(); it != asin_to_product.end(); ++it)
     {
         set<string> reviewers;
@@ -159,7 +163,7 @@ Review* create_review(string date, string helpful, string rating, string votes,
 
 
 /* Creates an adjacency list for the graph, node ID -> set of neighboring node
- * IDs.
+ * IDs. Users that have co-reviewed a product have an edge between them.
  */
 void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<Product*>>& co_reviews, map<int, set<int>>& user_graph)
 {
