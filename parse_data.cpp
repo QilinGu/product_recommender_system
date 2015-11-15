@@ -55,13 +55,15 @@ Review* create_review();
 // void make_product_graph(map<string, Product*>& asin_to_product);
 void make_user_graph(map< string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map< int, set< pair<int, int>> >& user_graph);
 // void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user);
-void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > > &users_to_products);
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > > &users_to_products, int &numPurchases, vector<string>&userVector);
 vector<string> split(string str, char delimiter);
 
 int getUserEdgeWeight(int user1, int user2);
 void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products);
 
 double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products);
+
+void extractTestSet(int numPurchases, vector<string> &userVector, map< string, set< string > >&users_to_products, set< pair<string, string> >&testSet);
 
 vector< pair<string, double> > makeBaselinePrediction(string user, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph);
 
@@ -97,10 +99,12 @@ int main()
     map< string, set< string > >users_to_products = map< string, set< string > >();
 
     
+    int numPurchases = 0;
+    vector<string> userVector;
     // parse the data file (makes the product-product graphs), the next two 
     // functions make the user-user graph. using the amazon-small.txt file for 
     // now since the other one is huge. feel free to use the regular data file.
-    parse_file("test.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user, users_to_products);
+    parse_file("test.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user, users_to_products, numPurchases, userVector);
     // parse_file("amazon-small.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user);
 
     group_user_co_reviews(user_co_reviews, asin_to_product, user_to_nodeid);
@@ -123,10 +127,13 @@ int main()
      */
     cout << "user_graph: " << user_graph.size() << endl;
 
+    set< pair<string, string> >testSet;
+    extractTestSet(numPurchases, userVector, users_to_products, testSet);
+
     make_product_graph(asin_to_product, product_graph, users_to_products);
 
     string user = "ANEIANH0WAT9D";
-    makeBaselinePrediction(user, users_to_products, product_graph);
+    vector< pair<string, double> >predictions =makeBaselinePrediction(user, users_to_products, product_graph);
     
     return 0;
 }
@@ -224,7 +231,7 @@ int getUserEdgeWeight(int user1, int user2){
  * product object). Also creates the amazon user ID -> node ID graph
  */
 // void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string)
-void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >&users_to_products)
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >&users_to_products, int &numPurchases, vector<string>&userVector)
 {
     ifstream infile(filename.c_str());
     cout << "opened" << endl;
@@ -243,7 +250,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
             id_to_product[current_product->id] = current_product;
             current_product = create_product();
             count++;
-            if (count == 10) break;
+            // if (count == 10) break;
             // if (count % 1000 == 0)
             // {
             //     cout << count << endl;
@@ -291,6 +298,8 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
             current_product->total_reviews = stoi(tokens[2]);
             current_product->downloaded_reviews = stoi(tokens[4]);
             current_product->avg_rating = stod(tokens[tokens.size() - 1]);
+
+            numPurchases += current_product->total_reviews;
         }
         else if (boost::starts_with(tokens[0], "1") || boost::starts_with(tokens[0], "2"))
         {
@@ -302,6 +311,8 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
                 user_to_nodeid[tokens[2]] = user_count;
                 nodeid_to_user[user_count++] = tokens[2];
                 users_to_products[tokens[2]] = set< string >();
+
+                userVector.push_back(tokens[2]);
             }
 
             // add product to user's set of purchased items
@@ -395,6 +406,39 @@ double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map<
     }
     return sum;
 }
+
+
+#define PERCENTAGE_TEST_PURCHASES 10
+void extractTestSet(int numPurchases, vector<string> &userVector, map< string, set< string > >&users_to_products, set< pair<string, string> >&testSet){
+
+    int numInTest = int(numPurchases*(PERCENTAGE_TEST_PURCHASES/100.0));
+    for (int i=0; i<numInTest; i++){
+        // pick random user that has purchased at least 2 products
+        int randInt = rand() % userVector.size();
+        string chosenUser = userVector[randInt];
+        while ( users_to_products[chosenUser].size() < 2 ){
+            randInt = rand() % userVector.size();
+            chosenUser = userVector[randInt];
+        }
+
+        // now pick random product from user which we will place in the test set
+        int randProduct = rand() % users_to_products[chosenUser].size();
+        set<string> products = users_to_products[chosenUser];
+        string chosenProduct = "";
+
+        int count = 0;
+        for (auto product_it = products.begin(); product_it != products.end(); ++product_it){
+            chosenProduct = *product_it;
+            if (count == randProduct) break;
+            count++;
+        }
+
+        // insert pair into test set and remove from users_to_products
+        testSet.insert( pair<string, string>(chosenUser, chosenProduct) );
+        users_to_products.erase(chosenUser);
+    }
+}
+
 
 #define NUMBER_IN_RECOMMENTATION_SET 5
 
