@@ -72,7 +72,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<str
 double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products, map<string, Product*>& asin_to_product);
 
 vector<string> split(string str, char delimiter);
-
+void cleanHeap(map<string, Product*>&asin_to_product);
 
 int main()
 {   
@@ -157,11 +157,29 @@ int main()
         }
     }
 
-    // cout << "making predictions" << endl;
-    // checkBaselinePredictions(test_set, users_to_products, product_graph);
+    cout << "making predictions" << endl;
+    checkBaselinePredictions(test_set, users_to_products, product_graph);
 
-    // cout << "done" << endl;
+    cout << "done" << endl;
+
+    cleanHeap(asin_to_product);
     return 0;
+}
+
+void cleanHeap(map<string, Product*>&asin_to_product){
+    for (auto it = asin_to_product.begin(); it != asin_to_product.end(); ++it){
+        Product *product = it->second;
+
+        delete product->categories;
+        delete product->similar;
+
+        for (auto review = product->reviews->begin(); review != product->reviews->end(); ++review){
+            delete review->second;
+        }
+
+        delete product->reviews;
+        delete product;
+    }
 }
 
 
@@ -341,9 +359,10 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<str
             users_to_products[ tokens[2] ].insert( current_product->asin );
         }
     } 
+
     asin_to_product[current_product->asin] = current_product;
-    current_product = create_product();
-    count++;
+    // current_product = create_product();
+    // count++;
 
     infile.close();
 }

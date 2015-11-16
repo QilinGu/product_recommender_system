@@ -3,3 +3,4 @@ parse_data: parse_data.cpp
 
 clean:
 	rm -f parse_data
+	make
