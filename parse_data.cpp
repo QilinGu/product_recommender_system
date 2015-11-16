@@ -1,11 +1,12 @@
+#include <ctime>
 #include <fstream>
 #include <iostream>
+#include <list>
 #include <map>
 #include <set>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <list>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -49,102 +50,117 @@ typedef struct {
 
 
 // function prototypes
-void group_user_co_reviews(map< pair<int, int>, set<Product*> >& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid);
+void checkBaselinePredictions(set< pair<string, string> >&test_set, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph);
+
 Product* create_product();
 Review* create_review();
 
-void make_user_graph(map< string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map< int, set< pair<int, int>> >& user_graph);
-
-void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > > &users_to_products, int &numPurchases, vector<string>&userVector);
-vector<string> split(string str, char delimiter);
+void extractTestSet(int num_purchases, vector<string> &user_vector, map< string, set< string > >&users_to_products, set< pair<string, string> >&test_set, map<string, Product*>& asin_to_product);
 
 int getUserEdgeWeight(int user1, int user2);
-void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products);
 
-double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products);
-
-void extractTestSet(int numPurchases, vector<string> &userVector, map< string, set< string > >&users_to_products, set< pair<string, string> >&testSet);
+void group_user_co_reviews(map< pair<int, int>, set<Product*> >& co_reviews, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid);
 
 set<string> makeBaselinePrediction(string user, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph);
 
-void checkBaselinePredictions(set< pair<string, string> >&testSet, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph);
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products);
 
+void make_user_graph(map< string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map< int, set< pair<int, int>> >& user_graph);
+
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > > &users_to_products, int &num_purchases, vector<string>&user_vector);
+
+double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products, map<string, Product*>& asin_to_product);
+
+vector<string> split(string str, char delimiter);
 
 
 int main()
-{
-    // initialize the maps/graphs
-    map<string, Product*> asin_to_product = map<string, Product*>();
-    map<int, Product*> id_to_product = map<int, Product*>();
-    map<string, int> user_to_nodeid = map<string, int>();
-    map<int, string> nodeid_to_user = map<int, string>();
-    map<pair<int, int>, set<Product*> > user_co_reviews = 
-        map<pair<int, int>, set<Product*> >();
+{   
+    // make sure the random numbers are really random
+    // srand(time(NULL))
 
-    /*
-    user_graph
-        key = user node
-        value = pair (userid2, edge weight)
-    */
+    /* asin_to_product
+        key = (string) amazon product id
+        value = (Product*) product object */
+    map<string, Product*> asin_to_product = map<string, Product*>();
+
+    /* user_to_nodeid
+        key = (string) amazon user id
+        value = (int) node id - not sure if this is necessary */
+    map<string, int> user_to_nodeid = map<string, int>();
+
+    /* nodeid_to_user
+        key = (int) node id
+        value = (string) amazon user id */
+    map<int, string> nodeid_to_user = map<int, string>();
+
+    /* user_co_reviews
+        key = pair (userid1, userid2)
+        value = (set) product objects that both users have reviewed */
+    map<pair<int, int>, set<Product*> > user_co_reviews = map<pair<int, int>, set<Product*> >();
+
+    /* user_graph
+        key = (int) user node
+        value = pair (userid2, edge weight) */
     map<int, set< pair<int, int>> > user_graph = map<int, set< pair<int, int>> >();
 
-    /*
-    product_graph
+    /* product_graph
         key = product asin
-        value = pair (product asin2, edge weight)
-    */
+        value = pair (product asin2, edge weight) */
     map<string, set< pair<string, double>> > product_graph = map<string, set< pair<string, double>> >();
 
-    /*
-    users_to_products
+    /* users_to_products
         key = username
-        value = set of products user has purchased
-    */
+        value = set of products user has purchased */
     map< string, set< string > >users_to_products = map< string, set< string > >();
 
     
-    int numPurchases = 0;
-    vector<string> userVector;
-    // parse the data file (makes the product-product graphs), the next two 
-    // functions make the user-user graph. using the amazon-small.txt file for 
-    // now since the other one is huge. feel free to use the regular data file.
-    parse_file("amazon-small.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user, users_to_products, numPurchases, userVector);
-    // parse_file("amazon-small.txt", asin_to_product, id_to_product, user_to_nodeid, nodeid_to_user);
+    int num_purchases = 0;
+    vector<string> user_vector;
 
-    group_user_co_reviews(user_co_reviews, asin_to_product, user_to_nodeid);
-    make_user_graph(user_to_nodeid, user_co_reviews, user_graph);
+    /* parse the data file (makes the product-product graphs), the next two 
+     * functions make the user-user graph. using the amazon-small.txt file for 
+     * now since the other one is huge. feel free to use the regular datafile. */
+    parse_file("amazon-large.txt", asin_to_product, user_to_nodeid, nodeid_to_user, users_to_products, num_purchases, user_vector);
 
-    // these two should be the same size
+    /* These graphs aren't used to make the baseline predictions so we aren't
+     * creating them right now. */
+    // group_user_co_reviews(user_co_reviews, asin_to_product, user_to_nodeid);
+    // make_user_graph(user_to_nodeid, user_co_reviews, user_graph);
+
     cout << "asin_to_product: " << asin_to_product.size() << endl;
-    cout << "id_to_product: " << id_to_product.size() << endl;
 
-    // these two should be the same size
-    cout << "user_to_nodeid: " << user_to_nodeid.size() << endl;
-    cout << "nodeid_to_user: " << nodeid_to_user.size() << endl;
+    // // these two should be the same size
+    // cout << "user_to_nodeid: " << user_to_nodeid.size() << endl;
+    // cout << "nodeid_to_user: " << nodeid_to_user.size() << endl;
 
-    // 25,000 users create 13 million co-reviews, this is huge
-    cout << "user_co_reviews: " << user_co_reviews.size() << endl;
+    /* we're not using these one right now */
+    // cout << "user_co_reviews: " << user_co_reviews.size() << endl;
+    // cout << "user_graph: " << user_graph.size() << endl;
 
-    /* this doesn't equal the size of the user_to_nodeid or node_id_to_user 
-     * graphs because some users don't have neighbors. however, it looks like
-     * there are only 300/25000 users that fall into this category.
-     */
-    cout << "user_graph: " << user_graph.size() << endl;
-
-    set< pair<string, string> >testSet;
-    extractTestSet(numPurchases, userVector, users_to_products, testSet);
+    /* roughly 1/10 purchases will be in the test set. this will allow us to 
+     * evaluate the performance of the baseline predictor as well as the one
+     * we are creating. the test set items are (string) user id, (string) asin.*/
+    cout << "making test set" << endl;
+    set< pair<string, string> > test_set = set< pair<string, string> >();
+    extractTestSet(num_purchases, user_vector, users_to_products, test_set, asin_to_product);
+    cout << "test set size: " << test_set.size() << endl;
 
     cout << "making product graph" << endl;
-
     make_product_graph(asin_to_product, product_graph, users_to_products);
+    for (auto it = product_graph.begin(); it != product_graph.end(); ++it)
+    {
+        cout << it->first << endl;
+        for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
+        {
+            cout << '\t' << it2->first << " " << it2->second << endl;
+        }
+    }
 
-    cout << "making predictions" << endl;
+    // cout << "making predictions" << endl;
+    // checkBaselinePredictions(test_set, users_to_products, product_graph);
 
-    checkBaselinePredictions(testSet, users_to_products, product_graph);
-
-    // string user = "ANEIANH0WAT9D";
-    // vector< pair<string, double> >predictions =makeBaselinePrediction(user, users_to_products, product_graph);
-    
+    // cout << "done" << endl;
     return 0;
 }
 
@@ -156,9 +172,9 @@ void group_user_co_reviews(map<pair<int, int>, set<Product*> >& co_reviews, map<
 {
     int count = 0;
 
-    // iterate through each product and get the set of users that have written
-    // a review for it. then iterate through each pair of users and add that
-    // product to their co-reviewed set
+    /* iterate through each product and get the set of users that have written
+     * a review for it. then iterate through each pair of users and add that
+     * product to their co-reviewed set. */
     for (auto it = asin_to_product.begin(); it != asin_to_product.end(); ++it)
     {
         set<string> reviewers;
@@ -187,8 +203,7 @@ void group_user_co_reviews(map<pair<int, int>, set<Product*> >& co_reviews, map<
 }
 
 
-/* Creates and returns a new product struct
- */
+/* Creates and returns a new product struct */
 Product* create_product()
 {
     Product* new_product = new Product();
@@ -200,8 +215,7 @@ Product* create_product()
 
 
 /* Creates and returns a new review struct initialized with the provided
- * information
- */
+ * information */
 Review* create_review(string date, string helpful, string rating, string votes,
     string product_id)
 {
@@ -216,8 +230,7 @@ Review* create_review(string date, string helpful, string rating, string votes,
 
 
 /* Creates an adjacency list for the graph, node ID -> set of neighboring node
- * IDs. Users that have co-reviewed a product have an edge between them.
- */
+ * IDs. Users that have co-reviewed a product have an edge between them. */
 void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<Product*> >& co_reviews, map<int, set< pair<int, int>> >& user_graph)
 {
     for (auto it = co_reviews.begin(); it != co_reviews.end(); ++it)
@@ -233,19 +246,16 @@ void make_user_graph(map<string, int>& user_to_nodeid, map<pair<int, int>, set<P
 }
 
 
-int getUserEdgeWeight(int user1, int user2){
+int getUserEdgeWeight(int user1, int user2) 
+{
     // TODO - FILL IN WHEN IMPLEMENTING OUR ALGORITHM
     return 0;
 }
 
 
-
-
 /* Creates the main product-product graph (asin -> product objects; node id ->
- * product object). Also creates the amazon user ID -> node ID graph
- */
-// void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string)
-void parse_file(string filename, map<string, Product*>& asin_to_product, map<int, Product*>& id_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >&users_to_products, int &numPurchases, vector<string>&userVector)
+ * product object). Also creates the amazon user ID -> node ID graph */
+void parse_file(string filename, map<string, Product*>& asin_to_product, map<string, int>& user_to_nodeid, map<int, string>& nodeid_to_user, map< string, set< string > >&users_to_products, int &num_purchases, vector<string>&user_vector)
 {
     ifstream infile(filename.c_str());
     cout << "opened" << endl;
@@ -261,10 +271,8 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
         if (line.size() <= 1)
         {
             asin_to_product[current_product->asin] = current_product;
-            id_to_product[current_product->id] = current_product;
             current_product = create_product();
             count++;
-            // if (count == 10) break;
             if (count % 1000 == 0)
             {
                 cout << count << endl;
@@ -313,7 +321,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
             current_product->downloaded_reviews = stoi(tokens[4]);
             current_product->avg_rating = stod(tokens[tokens.size() - 1]);
 
-            numPurchases += current_product->total_reviews;
+            num_purchases += current_product->total_reviews;
         }
         else if (boost::starts_with(tokens[0], "1") || boost::starts_with(tokens[0], "2"))
         {
@@ -326,7 +334,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
                 nodeid_to_user[user_count++] = tokens[2];
                 users_to_products[tokens[2]] = set< string >();
 
-                userVector.push_back(tokens[2]);
+                user_vector.push_back(tokens[2]);
             }
 
             // add product to user's set of purchased items
@@ -334,7 +342,6 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
         }
     } 
     asin_to_product[current_product->asin] = current_product;
-    id_to_product[current_product->id] = current_product;
     current_product = create_product();
     count++;
 
@@ -343,8 +350,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<int
 
 
 /* For a given string and delimiter, returns a vector of tokens split using the
- * delimiter.
- */
+ * delimiter. */
 vector<string> split(string str, char delimiter)
 {
     vector<string> tokens;
@@ -364,168 +370,190 @@ vector<string> split(string str, char delimiter)
 
 /*
     Constructs product to product graph
-    Weight of edges will be added for baseline
-*/
-void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products){
+    Weight of edges will be added for baseline */
+void make_product_graph(map<string, Product*> &asin_to_product, map<string, set< pair<string, double>> > &product_graph, map< string, set< string > >&users_to_products)
+{
+    for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it)
+    {
+        string first_product_string = product_it->first;
+        Product *first_product = product_it->second;
 
-    for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it){
+        for (auto second_product_it = first_product->similar->begin(); second_product_it != first_product->similar->end(); ++second_product_it)
+        {
+            if (asin_to_product.find(*second_product_it) != asin_to_product.end())
+            {
+                string second_product_string = *second_product_it;
+                Product *second_product = asin_to_product[*second_product_it];
 
-        string firstProductString = product_it->first;
-        Product *firstProduct = product_it->second;
-
-        for (auto second_product_it = firstProduct->similar->begin(); second_product_it != firstProduct->similar->end(); ++second_product_it){
-
-            if (asin_to_product.find(*second_product_it) != asin_to_product.end()){
-                string secondProductString = *second_product_it;
-                Product *secondProduct = asin_to_product[*second_product_it];
-                // cout << secondProductString << endl;
                 // number of users that bought object j
-                int o_j = secondProduct->reviews->size();
+                int o_j = second_product->reviews->size();
+                double weight;
+                if (o_j == 0)
+                {
+                    weight = 0;
+                } else
+                {
+                    double score = scoreUsersWhoPurchasedBothProducts(first_product_string, second_product_string, users_to_products, asin_to_product);
+                    weight = (1.0 / double(o_j)) * score;
+                }
 
-                double score = scoreUsersWhoPurchasedBothProducts(firstProductString, secondProductString, users_to_products);
-
-                double weight = (1/double(o_j))*score;
-                // cout << firstProductString << ", " << secondProductString << " - " << score << endl;
                 // add edge weight to product graph
-                product_graph[ firstProductString ].insert( pair<string, double>(secondProductString, weight) );
+                product_graph[ first_product_string ].insert( pair<string, double>(second_product_string, weight) );
             }
         }
     }
 }
 
 
-void printSet(set<string>products){
-    for (auto it = products.begin(); it != products.end(); ++it){
+void printSet(set<string>products)
+{
+    for (auto it = products.begin(); it != products.end(); ++it)
+    {
         cout << *it << ", ";
     }
     cout << endl;
 }
 
 
-double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products){
-
+double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map< string, set< string > >&users_to_products, map<string, Product*>& asin_to_product)
+{
     double sum = 0;
-    // cout << users_to_products.size() << endl;
-    
-    for (auto user_it = users_to_products.begin(); user_it != users_to_products.end(); ++user_it){
-        // string user = user_it->first;
-        // cout << user_it->first << ": ";
-        set<string>products = user_it->second;
-        // printSet(products);
-
-        int userHasBoth = 0;
-        if(products.find(product1) != products.end() && products.find(product2) != products.end()) userHasBoth = 1;
-
-        int u_l = products.size();
-
-        sum += userHasBoth/double(u_l);
+    Product* prod1 = asin_to_product[product1];
+    Product* prod2 = asin_to_product[product2];
+    for (auto it = prod1->reviews->begin(); it != prod1->reviews->end(); ++it)
+    {
+        if (prod2->reviews->find(it->first) != prod2->reviews->end())
+        {
+            sum += 1.0 / double(users_to_products[it->first].size());
+        }
     }
+    
     return sum;
 }
 
 
 #define PERCENTAGE_TEST_PURCHASES 10
-void extractTestSet(int numPurchases, vector<string> &userVector, map< string, set< string > >&users_to_products, set< pair<string, string> >&testSet){
-
-    int numInTest = int(numPurchases*(PERCENTAGE_TEST_PURCHASES/100.0));
-    for (int i=0; i<numInTest; i++){
+void extractTestSet(int num_purchases, vector<string>& user_vector, map< string, set< string > >& users_to_products, set< pair<string, string> >& test_set, map<string, Product*>& asin_to_product) 
+{   
+    // int numInTest = int(num_purchases * (PERCENTAGE_TEST_PURCHASES / 100.0));
+    int numInTest = 100;
+    for (int i = 0; i < numInTest; i++)
+    {
         // pick random user that has purchased at least 2 products
-        int randInt = rand() % userVector.size();
-        string chosenUser = userVector[randInt];
-        while ( users_to_products[chosenUser].size() < 2 ){
-            randInt = rand() % userVector.size();
-            chosenUser = userVector[randInt];
+        int rand_int = rand() % user_vector.size();
+        string chosen_user = user_vector[rand_int];
+        bool next = false;
+        int tries = 0;
+        while ( users_to_products[chosen_user].size() < 2 )
+        {
+            if (tries++ > 25)
+            {
+                next = true;
+                break;
+            }
+            rand_int = rand() % user_vector.size();
+            chosen_user = user_vector[rand_int];
         }
 
+        if (next || users_to_products[chosen_user].size() == 0)
+        {
+            i--;
+            continue;
+        } 
+
         // now pick random product from user which we will place in the test set
-        int randProduct = rand() % users_to_products[chosenUser].size();
-        set<string> products = users_to_products[chosenUser];
-        string chosenProduct = "";
+        int rand_product = rand() % users_to_products[chosen_user].size();
+        set<string> products = users_to_products[chosen_user];
+        string chosen_product;
 
         int count = 0;
-        for (auto product_it = products.begin(); product_it != products.end(); ++product_it){
-            chosenProduct = *product_it;
-            if (count == randProduct) break;
+        for (auto product_it = products.begin(); product_it != products.end(); ++product_it)
+        {
+            chosen_product = *product_it;
+            if (count == rand_product) break;
             count++;
         }
 
         // insert pair into test set and remove from users_to_products
-        testSet.insert( pair<string, string>(chosenUser, chosenProduct) );
-        users_to_products[chosenUser].erase(chosenProduct);
+        test_set.insert( pair<string, string>(chosen_user, chosen_product) );
+        users_to_products[chosen_user].erase(chosen_product);
+        user_vector.erase(remove(user_vector.begin(), user_vector.end(), chosen_user), user_vector.end());
+        asin_to_product[chosen_product]->reviews->erase(chosen_user);
     }
 }
-
-
-
 
 
 #define NUMBER_IN_RECOMMENTATION_SET 5
 
-void printRecommendations(vector< pair<string, double> >&productRecommendations){
-    for (int i=0; i<NUMBER_IN_RECOMMENTATION_SET; i++){
-        if (i < productRecommendations.size()){
-            cout << productRecommendations[i].first << ", " << productRecommendations[i].second << endl;
+void printRecommendations(vector< pair<string, double> >&productRecommendations)
+{
+    for (int i = 0; i < NUMBER_IN_RECOMMENTATION_SET; i++)
+    {
+        if (i < productRecommendations.size())
+        {
+            cout << (productRecommendations.at(i)).first << ", " << (productRecommendations.at(i)).second << endl;
         }
     }
 }
 
-bool sortRecommendationsCmp(pair<string, double>edge1, pair<string, double>edge2){
+
+bool sortRecommendationsCmp(const pair<string, double>& edge1, const pair<string, double>& edge2)
+{
     return (edge1.second >= edge2.second);
 }
 
-set<string> makeBaselinePrediction(string user, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph){
 
-    vector< pair<string, double> >recommendationCandidates;
+set<string> makeBaselinePrediction(string user, map< string, set< string > >& users_to_products, map<string, set< pair<string, double>> >& product_graph)
+{
+    vector< pair<string, double> >recommendation_candidates = vector<pair<string, double>>();
     
     // iterate over items in user's purchased set
-    for (auto items_it = users_to_products[user].begin(); items_it != users_to_products[user].end();      ++items_it){
-
-        string itemAsin = *items_it;
+    for (auto items_it = users_to_products[user].begin(); items_it != users_to_products[user].end(); ++items_it)
+    {
+        string item_asin = *items_it;
 
         // iterate over edges for a purchased item
-        for (auto edges_it = product_graph[itemAsin].begin(); edges_it != product_graph[itemAsin].end(); ++edges_it){
-
+        for (auto edges_it = product_graph[item_asin].begin(); edges_it != product_graph[item_asin].end(); ++edges_it)
+        {
             pair<string, double>edge = *edges_it;
-            recommendationCandidates.push_back(edge);
+            recommendation_candidates.push_back(edge);
         }
+        // printRecommendations(recommendation_candidates);
     }
+    cout << "ended loop" << endl;
 
     // sort list of recommendations
-    sort(recommendationCandidates.begin(), recommendationCandidates.end(), sortRecommendationsCmp );
+    sort(recommendation_candidates.begin(), recommendation_candidates.end(), sortRecommendationsCmp);
 
-    // cout << "User: " << user << endl;
-    // printRecommendations(recommendationCandidates);
+    cout << "sorted" << endl;
 
-    set<string>productRecommendations;
-    int sizeOfCandidates = recommendationCandidates.size();
-    for (int i=0; i<NUMBER_IN_RECOMMENTATION_SET; i++){
-        if (i == sizeOfCandidates) return productRecommendations;
-
-        productRecommendations.insert(recommendationCandidates[i].first);
+    set<string>productRecommendations = set<string>();
+    for (int i = 0; i < NUMBER_IN_RECOMMENTATION_SET; i++)
+    {
+        if (i >= recommendation_candidates.size()) break;
+        productRecommendations.insert((recommendation_candidates.at(i)).first);
     }
+
+    cout << "returning" << endl;
     return productRecommendations;
 }
 
 
-void checkBaselinePredictions(set< pair<string, string> >&testSet, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph){
-
+void checkBaselinePredictions(set< pair<string, string> >&test_set, map< string, set< string > >&users_to_products, map<string, set< pair<string, double>> >&product_graph)
+{
     int numCorrect = 0;
-    for (auto test_it = testSet.begin(); test_it != testSet.end(); ++test_it){
-
+    for (auto test_it = test_set.begin(); test_it != test_set.end(); ++test_it)
+    {
         string user = test_it->first;
         string product = test_it->second;
+        cout << user << " " << product << endl;
 
         set<string>predictions = makeBaselinePrediction(user, users_to_products, product_graph);
-        // for (auto i = predictions.begin(); i != predictions.end(); ++i)
-            // std::cout << *i << ' ';
 
+        cout << "made baseline prediction" << endl;
         if ( predictions.find(product) != predictions.end() ) numCorrect++;
     }
 
     cout << "Number of Correct Predictions: " << numCorrect << endl;
-    cout << "Percentage Correct: " << 100*(numCorrect/double(testSet.size())) << "%" << endl;
+    cout << "Percentage Correct: " << 100.0 * (numCorrect / double(test_set.size())) << "%" << endl;
 }
-
-
-
-
