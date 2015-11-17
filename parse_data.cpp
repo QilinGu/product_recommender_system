@@ -74,10 +74,10 @@ double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map<
 vector<string> split(string str, char delimiter);
 void cleanHeap(map<string, Product*>&asin_to_product);
 
-int main()
+int main(int argc, char* argv[])
 {   
     // make sure the random numbers are really random
-    // srand(time(NULL))
+    // srand(time(NULL));
 
     /* asin_to_product
         key = (string) amazon product id
@@ -116,12 +116,26 @@ int main()
 
     
     int num_purchases = 0;
-    vector<string> user_vector;
+    vector<string> user_vector = vector<string>();
 
     /* parse the data file (makes the product-product graphs), the next two 
      * functions make the user-user graph. using the amazon-small.txt file for 
      * now since the other one is huge. feel free to use the regular datafile. */
     parse_file("amazon-large.txt", asin_to_product, user_to_nodeid, nodeid_to_user, users_to_products, num_purchases, user_vector);
+    // int count = 0;
+    // for (auto it = users_to_products.begin(); it != users_to_products.end(); ++it)
+    // {
+    //     if (count++ == 5000) break;
+    //     cout << it->first << ":" << endl;
+    //     if (it->second.size() > 1)
+    //     {
+    //         for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
+    //         {
+    //             cout << '\t' << *it2 << endl;
+    //         }
+    //     }
+    // }
+    cout << "A12N9YU5K516JF: " << users_to_products["A12N9YU5K516JF"].size() << endl;
 
     /* These graphs aren't used to make the baseline predictions so we aren't
      * creating them right now. */
@@ -145,17 +159,22 @@ int main()
     set< pair<string, string> > test_set = set< pair<string, string> >();
     extractTestSet(num_purchases, user_vector, users_to_products, test_set, asin_to_product);
     cout << "test set size: " << test_set.size() << endl;
+    // for (auto it = test_set.begin(); it != test_set.end(); ++it)
+    // {
+    //     cout << (*it).first << ": " << (*it).second << endl;
+    // }
 
     cout << "making product graph" << endl;
     make_product_graph(asin_to_product, product_graph, users_to_products);
-    for (auto it = product_graph.begin(); it != product_graph.end(); ++it)
-    {
-        cout << it->first << endl;
-        for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
-        {
-            cout << '\t' << it2->first << " " << it2->second << endl;
-        }
-    }
+    // int counter = 0;
+    // for (auto it = product_graph.begin(); it != product_graph.end(); ++it)
+    // {
+    //     cout << it->first << endl;
+    //     for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
+    //     {
+    //         cout << "  " << (*it2).first << endl;
+    //     }
+    // }
 
     cout << "making predictions" << endl;
     checkBaselinePredictions(test_set, users_to_products, product_graph);
@@ -356,7 +375,7 @@ void parse_file(string filename, map<string, Product*>& asin_to_product, map<str
             }
 
             // add product to user's set of purchased items
-            users_to_products[ tokens[2] ].insert( current_product->asin );
+            users_to_products[ tokens[2] ].insert(current_product->asin);
         }
     } 
 
@@ -395,6 +414,7 @@ void make_product_graph(map<string, Product*> &asin_to_product, map<string, set<
     for (auto product_it = asin_to_product.begin(); product_it != asin_to_product.end(); ++product_it)
     {
         string first_product_string = product_it->first;
+        // cout << first_product_string << endl;
         Product *first_product = product_it->second;
 
         for (auto second_product_it = first_product->similar->begin(); second_product_it != first_product->similar->end(); ++second_product_it)
@@ -402,6 +422,7 @@ void make_product_graph(map<string, Product*> &asin_to_product, map<string, set<
             if (asin_to_product.find(*second_product_it) != asin_to_product.end())
             {
                 string second_product_string = *second_product_it;
+                // cout << "  " << second_product_string << endl;
                 Product *second_product = asin_to_product[*second_product_it];
 
                 // number of users that bought object j
@@ -417,10 +438,23 @@ void make_product_graph(map<string, Product*> &asin_to_product, map<string, set<
                 }
 
                 // add edge weight to product graph
-                product_graph[ first_product_string ].insert( pair<string, double>(second_product_string, weight) );
+                // pair<string, double> edge = pair<string, double>(second_product_string, weight);
+                // cout << "  " << edge.first << endl;
+                product_graph[ first_product_string ].insert(pair<string, double>(second_product_string, weight));
+                // auto found_edge = product_graph[first_product_string].find(edge);
+                // cout << "  " << (*found_edge).first << endl;
             }
         }
     }
+
+    // for (auto it = product_graph.begin(); it != product_graph.end(); ++it)
+    // {
+    //     cout << it->first << endl;
+    //     for (auto it2 = it->second.begin(); it2 != it->second.end(); ++it2)
+    //     {
+    //         cout << "  " << (*it2).first << endl;
+    //     }
+    // }
 }
 
 
@@ -451,7 +485,7 @@ double scoreUsersWhoPurchasedBothProducts(string product1, string product2, map<
 }
 
 
-#define PERCENTAGE_TEST_PURCHASES 10
+#define PERCENTAGE_TEST_PURCHASES 5
 void extractTestSet(int num_purchases, vector<string>& user_vector, map< string, set< string > >& users_to_products, set< pair<string, string> >& test_set, map<string, Product*>& asin_to_product) 
 {   
     // int numInTest = int(num_purchases * (PERCENTAGE_TEST_PURCHASES / 100.0));
@@ -530,21 +564,23 @@ set<string> makeBaselinePrediction(string user, map< string, set< string > >& us
     for (auto items_it = users_to_products[user].begin(); items_it != users_to_products[user].end(); ++items_it)
     {
         string item_asin = *items_it;
+        // cout << item_asin << endl;
 
         // iterate over edges for a purchased item
         for (auto edges_it = product_graph[item_asin].begin(); edges_it != product_graph[item_asin].end(); ++edges_it)
         {
             pair<string, double>edge = *edges_it;
+            // cout << "  " << edge.first << endl;
             recommendation_candidates.push_back(edge);
         }
         // printRecommendations(recommendation_candidates);
     }
-    cout << "ended loop" << endl;
+    // cout << "ended loop" << endl;
 
     // sort list of recommendations
     sort(recommendation_candidates.begin(), recommendation_candidates.end(), sortRecommendationsCmp);
 
-    cout << "sorted" << endl;
+    // cout << "sorted" << endl;
 
     set<string>productRecommendations = set<string>();
     for (int i = 0; i < NUMBER_IN_RECOMMENTATION_SET; i++)
@@ -553,7 +589,7 @@ set<string> makeBaselinePrediction(string user, map< string, set< string > >& us
         productRecommendations.insert((recommendation_candidates.at(i)).first);
     }
 
-    cout << "returning" << endl;
+    // cout << "returning" << endl;
     return productRecommendations;
 }
 
@@ -565,11 +601,16 @@ void checkBaselinePredictions(set< pair<string, string> >&test_set, map< string,
     {
         string user = test_it->first;
         string product = test_it->second;
-        cout << user << " " << product << endl;
+        // cout << user << " " << product << endl;
 
         set<string>predictions = makeBaselinePrediction(user, users_to_products, product_graph);
 
-        cout << "made baseline prediction" << endl;
+        // cout << "made baseline prediction" << endl;
+        // cout << product << endl;
+        // for (auto it = predictions.begin(); it != predictions.end(); ++it)
+        // {
+            // cout << "  " << *it << endl;
+        // }
         if ( predictions.find(product) != predictions.end() ) numCorrect++;
     }
 
