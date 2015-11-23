@@ -109,12 +109,11 @@ users_who_reviewed_product and products_users_purchased graphs
 number_test_purchases = 1000
 def extract_test_set(user_purchases, product_reviewers):
     test_set = set()
-    for i in range(number_test_purchases):
-        random_user = random.randint(0, len(user_purchases))
+    while len(test_set) < number_test_purchases:
+        random_user = random.randint(1, len(user_purchases))
         purchased_products = user_purchases[random_user]
-        if len(purchased_products) == 0:
+        if len(purchased_products) < 2:
             # if the user didn't purchase anyitems, move to the next one
-            i -= 1
             continue
         random_product = random.sample(purchased_products, 1)[0]
         test_set.add((random_user, random_product))
@@ -172,7 +171,7 @@ def baseline_predictions(test_set, user_purchases, product_reviewers, product_gr
             number_correct += 1
 
     print "number_correct: ", number_correct
-    print "percentage of correct predictions: ", 100.0 * number_correct / float(len(test_set)), "%"
+    print "percentage correct: ", 100.0 * number_correct / float(len(test_set)), "%"
 
 
 def main():
