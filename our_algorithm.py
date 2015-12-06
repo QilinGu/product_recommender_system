@@ -63,6 +63,8 @@ def parse_file(filename, create_user_graph=False):
                 products_processed += 1
                 if (products_processed % 1000 == 0):
                     print products_processed
+                    if create_user_graph:
+                        print 'User graph:', len(user_graph)
                 """for user in current_product_users_who_reviewed:
                     products_users_purchased[user].add(current_product_id)
                     users_who_reviewed_product[current_product_id].add(user)
@@ -85,6 +87,9 @@ def parse_file(filename, create_user_graph=False):
                 current_product_id = None
                 current_product_amazon_id = None
                 ratings = dict()
+                continue
+
+            if not line:
                 continue
 
             elif line[0] == ASIN:
